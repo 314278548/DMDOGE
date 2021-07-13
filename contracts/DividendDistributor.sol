@@ -1,5 +1,5 @@
 pragma solidity ^0.6.12;
-
+// SPDX-License-Identifier: Unlicensed
 import './SafeMath.sol';
 import "./IERC20.sol";
 import "./IUniswapV2Router02.sol";
@@ -16,7 +16,7 @@ contract DividendDistributor is IDividendDistributor {
         uint256 totalRealised;
     }
 
-    IERC20 USDT = IBEP20(0x55d398326f99059fF775485246999027B3197955);
+    IERC20 USDT = IERC20(0x55d398326f99059fF775485246999027B3197955);
     address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     IUniswapV2Router02 router;
 
@@ -49,7 +49,7 @@ contract DividendDistributor is IDividendDistributor {
         _;
     }
 
-    constructor (address _router) {
+    constructor (address _router) public {
         router = _router != address(0)
         ? IUniswapV2Router02(_router)
         : IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);

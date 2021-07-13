@@ -1,5 +1,5 @@
 pragma solidity ^0.6.12;
-
+// SPDX-License-Identifier: Unlicensed
 interface IDividendDistributor {
     function setDistributionCriteria(uint256 _minPeriod, uint256 _minDistribution) external;
 

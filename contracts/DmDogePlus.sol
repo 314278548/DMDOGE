@@ -1,5 +1,5 @@
-pragma solidity ^0.6.12;
-
+pragma solidity ^0.7.4;
+// SPDX-License-Identifier: Unlicensed
 import "./IERC20.sol";
 import "./SafeMath.sol";
 import "./Auth.sol";
@@ -10,14 +10,14 @@ import "./IUniswapV2Router02.sol";
 contract DmDogePlus is IERC20, Auth {
     using SafeMath for uint256;
 
-    address USDT = 0x55d398326f99059fF775485246999027B3197955;
-    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address USDT = 0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684;
+    address WBNB = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd;
     address DEAD = 0x000000000000000000000000000000000000dEaD;
     address ZERO = 0x0000000000000000000000000000000000000000;
 
     string constant _name = "DmDogePlus";
     string constant _symbol = "DmDogePlus";
-    uint8 constant _decimals = 9;
+    uint256 constant _decimals = 9;
 
     uint256 _totalSupply = 1000000000000000 * (10 ** _decimals);
     uint256 public _maxSellTxAmount = 1 * 10 ** 18; // 1WETH
@@ -29,7 +29,7 @@ contract DmDogePlus is IERC20, Auth {
     mapping(address => bool) isTxLimitExempt;
     mapping(address => bool) isDividendExempt;
     mapping(address => bool) isBlacklisted;
-    mapping(address => int) sellNumberList;
+    mapping(address => uint) sellNumberList;
     mapping(address => bool) isSellFeeMax;
 
     uint256 basicFee = 10000;
@@ -75,7 +75,7 @@ contract DmDogePlus is IERC20, Auth {
         inSwap = false;}
 
     constructor () Auth(msg.sender) {
-        router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+        router = IUniswapV2Router02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3);
         pair = IUniswapV2Factory(router.factory()).createPair(WBNB, address(this));
         _allowances[address(this)][address(router)] = uint256(- 1);
 
@@ -98,13 +98,13 @@ contract DmDogePlus is IERC20, Auth {
 
     function totalSupply() external view override returns (uint256) {return _totalSupply;}
 
-    function decimals() external pure override returns (uint8) {return _decimals;}
+    function decimals() external pure returns (uint) {return _decimals;}
 
-    function symbol() external pure override returns (string memory) {return _symbol;}
+    function symbol() external pure returns (string memory) {return _symbol;}
 
-    function name() external pure override returns (string memory) {return _name;}
+    function name() external pure returns (string memory) {return _name;}
 
-    function getOwner() external view override returns (address) {return owner;}
+    function getOwner() external view returns (address) {return owner;}
 
     function balanceOf(address account) public view override returns (uint256) {return _balances[account];}
 
@@ -174,8 +174,8 @@ contract DmDogePlus is IERC20, Auth {
 
     function checkTxLimit(address sender, address recipient, uint256 amount) internal view {
         //sell and normal tx
-        if (block.number > launchedAt + 3 && recipient == pair) {
-            require(tokenWethValue(amount) <= _maxSellTxAmount ||
+        if (launchedAt > 0 && block.number > launchedAt + 3 && recipient == pair) {
+             require(tokenWethValue(amount) <= _maxSellTxAmount ||
             isTxLimitExempt[sender] || isTxLimitExempt[recipient], "TX Limit Exceeded");}
     }
 
@@ -194,10 +194,31 @@ contract DmDogePlus is IERC20, Auth {
         }
     }
 
-    function getTotalFee(bool selling) public view returns (uint256) {
-        if (launchedAt + 3 > block.number) {return feeDenominator.sub(1);}
-        if (selling && buybackMultiplierTriggeredAt.add(buybackMultiplierLength) > block.timestamp) {return getMultipliedFee();}
-        return totalFee;
+    function getTotalFee(address sender, address receiver) private returns (uint256 fee) {
+        bool selling = receiver == pair;
+        if (launchedAt + 3 > block.number) {
+            fee = feeDenominator.sub(1);
+        } else {
+            if (selling && buybackMultiplierTriggeredAt.add(buybackMultiplierLength) > block.timestamp) {
+                fee = getMultipliedFee();
+            } else {
+                fee = totalFee;
+            }
+            if (selling) {
+                if (isSellFeeMax[sender]) {
+                    fee = maxFee;
+                } else {
+                    sellNumberList[sender] += 1;
+                    uint afterFee = fee.add(basicFee.mul(sellNumberList[sender]));
+                    if (afterFee >= maxFee) {
+                        isSellFeeMax[sender] = true;
+                        fee = maxFee;
+                    } else {
+                        fee = afterFee;
+                    }
+                }
+            }
+        }
     }
 
     function getMultipliedFee() public view returns (uint256) {
@@ -207,22 +228,8 @@ contract DmDogePlus is IERC20, Auth {
     }
 
     function takeFee(address sender, address receiver, uint256 amount) internal returns (uint256) {
-        bool selling = receiver == pair;
-        uint fee = getTotalFee(selling);
-        if (selling) {
-            if (isSellFeeMax[sender]) {
-                fee = maxFee;
-            } else {
-                sellNumberList[sender] += 1;
-                uint afterFee = fee.add(basicFee.mul(sellNumberList[sender]));
-                if (afterFee >= maxFee) {
-                    isSellFeeMax[sender] = true;
-                    fee = maxFee;
-                } else {
-                    fee = afterFee;
-                }
-            }
-        }
+        uint fee = getTotalFee(sender, receiver);
+
         uint256 feeAmount = amount.mul(fee).div(feeDenominator);
         _balances[address(this)] = _balances[address(this)].add(feeAmount);
         emit Transfer(sender, address(this), feeAmount);

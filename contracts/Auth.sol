@@ -1,10 +1,10 @@
 pragma solidity ^0.6.12;
-
+// SPDX-License-Identifier: Unlicensed
 abstract contract Auth {
     address internal owner;
     mapping(address => bool) internal authorizations;
 
-    constructor(address _owner) {
+    constructor(address _owner) public {
         owner = _owner;
         authorizations[_owner] = true;
     }
